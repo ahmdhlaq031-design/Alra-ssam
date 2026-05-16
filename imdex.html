@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2d2d30">
+    <title>الرسام - Paint للجوال</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #2d2d30;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .paint-app {
+            background: #d4d8e4;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            max-width: 100%;
+            border: none;
+            position: relative;
+        }
+
+        /* ==================== شريط العنوان ==================== */
+        .title-bar {
+            background: linear-gradient(180deg, #e8f0fc 0%, #c4d4ec 8%, #b0c4de 15%, #9db5d4 100%);
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #7f9db9;
+            min-height: 32px;
+            z-index: 10;
+        }
+        .title-left { display: flex; align-items: center; gap: 6px; }
+        .app-icon { width: 18px; height: 18px; background: linear-gradient(135deg, #f5b66b, #e3843a); border-radius: 3px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; }
+        .title-text { font-size: 11px; color: #1e3a5f; font-weight: 500; }
+        .window-controls { display: flex; gap: 2px; }
+        .win-btn { width: 24px; height: 20px; border: 1px solid #8ba5c4; background: linear-gradient(180deg, #e8f0fc 0%, #c1d2e8 50%, #a8bdd6 100%); border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #1e3a5f; }
+        .win-btn.close-btn { background: linear-gradient(180deg, #e8947a 0%, #cf5c45 50%, #b83a2a 100%); border-color: #933d2e; color: white; }
+
+        /* ==================== شريط القوائم ==================== */
+        .menu-bar {
+            background: #e1e8f5;
+            padding: 2px 6px;
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid #bcc7da;
+            font-size: 11px;
+            flex-wrap: wrap;
+        }
+        .menu-item {
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 3px;
+            background: #e1e8f5;
+            border: none;
+            font-size: 11px;
+        }
+        .menu-item:active { background: #c5d5e8; }
+
+        /* ==================== شريط الأدوات الجانبي ==================== */
+        .workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .tools-sidebar {
+            background: #e1e8f5;
+            width: 48px;
+            border-right: 1px solid #bcc7da;
+            padding: 8px 2px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .tool-icon {
+            width: 38px;
+            height: 38px;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .tool-icon:active, .tool-icon.selected {
+            border: 1px solid #7f9db9;
+            background: #c5d5e8;
+        }
+        .tool-separator {
+            width: 30px;
+            height: 1px;
+            background: #b0c0d6;
+            margin: 4px 0;
+        }
+
+        /* ==================== منطقة الرسم ==================== */
+        .canvas-area {
+            background: #e8ecf5;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
+            position: relative;
+        }
+        canvas {
+            background: white;
+            border: 1px solid #5b6d80;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.1);
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* ==================== لوحة الألوان السفلية ==================== */
+        .color-panel {
+            background: #e1e8f5;
+            border-top: 1px solid #bcc7da;
+            border-bottom: 1px solid #bcc7da;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 50px;
+        }
+        .color-palette {
+            display: flex;
+            gap: 2px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        .color-swatch {
+            width: 22px;
+            height: 22px;
+            border: 1px solid #7a8ea0;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .color-swatch.selected-color { border: 2px solid black; box-shadow: 0 0 0 1px white; }
+        .color-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: #d4d8e4;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .color-box1 { width: 28px; height: 28px; border: 1px solid #000; background: black; cursor: pointer; }
+        .color-box2 { width: 28px; height: 28px; border: 1px solid #000; background: white; cursor: pointer; margin-left: -10px; }
+        .size-control { display: flex; align-items: center; gap: 8px; background: #d4d8e4; padding: 2px 8px; border-radius: 4px; }
+        #brushSize { width: 80px; }
+        input[type="color"] { width: 32px; height: 32px; border: 1px solid #7a8ea0; border-radius: 4px; cursor: pointer; }
+
+        /* ==================== شريط الحالة ==================== */
+        .status-bar {
+            background: #e1e8f5;
+            border-top: 1px solid #b0c0d6;
+            padding: 2px 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #3a4f6a;
+            min-height: 22px;
+        }
+        .zoom-control { display: flex; gap: 6px; align-items: center; }
+        .zoom-slider { width: 80px; }
+    </style>
+</head>
+<body>
+<div class="paint-app">
+    <div class="title-bar">
+        <div class="title-left"><div class="app-icon">🎨</div><span class="title-text">الرسام - Paint</span></div>
+        <div class="window-controls"><button class="win-btn close-btn" id="closeBtn">✕</button></div>
+    </div>
+
+    <div class="menu-bar">
+        <button class="menu-item" id="menuNew">📄 جديد</button>
+        <button class="menu-item" id="menuSave">💾 حفظ كصورة</button>
+        <button class="menu-item" id="menuUndo">↩️ تراجع</button>
+        <button class="menu-item" id="menuRedo">↪️ إعادة</button>
+    </div>
+
+    <div class="workspace">
+        <div class="tools-sidebar" id="toolsSidebar">
+            <button class="tool-icon selected" data-tool="pencil" title="قلم رصاص">✏️</button>
+            <button class="tool-icon" data-tool="brush" title="فرشاة">🖌️</button>
+            <button class="tool-icon" data-tool="eraser" title="ممحاة">🧹</button>
+            <button class="tool-icon" data-tool="fill" title="تعبئة">🪣</button>
+            <button class="tool-icon" data-tool="picker" title="اختيار لون">🔍</button>
+            <div class="tool-separator"></div>
+            <button class="tool-icon" data-shape="rectangle" title="مستطيل">▬</button>
+            <button class="tool-icon" data-shape="ellipse" title="قطع ناقص">⬭</button>
+            <button class="tool-icon" data-shape="line" title="خط">╱</button>
+            <div class="tool-separator"></div>
+            <button class="tool-icon" data-shape="triangle" title="مثلث">▲</button>
+            <button class="tool-icon" data-shape="diamond" title="معين">◆</button>
+            <button class="tool-icon" data-shape="star" title="نجمة">★</button>
+            <button class="tool-icon" data-shape="cloud" title="غيمة">☁️</button>
+            <button class="tool-icon" data-shape="heart" title="قلب">❤️</button>
+            <button class="tool-icon" data-shape="arrow" title="سهم">➡️</button>
+            <button class="tool-icon" data-shape="hexagon" title="مسدس">⬡</button>
+        </div>
+
+        <div class="canvas-area"><canvas id="mainCanvas" width="800" height="500"></canvas></div>
+    </div>
+
+    <div class="color-panel">
+        <div class="color-palette" id="colorPalette"></div>
+        <div class="color-indicator">
+            <div class="color-box1" id="color1Box"></div>
+            <div class="color-box2" id="color2Box"></div>
+            <input type="color" id="customColorPicker" value="#000000">
+        </div>
+        <div class="size-control">
+            <span>سماكة:</span>
+            <input type="range" id="brushSize" min="1" max="20" value="2">
+            <span id="sizeValue">2</span>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="cursorPos">0, 0</span>
+        <span id="canvasSize">800×500</span>
+        <div class="zoom-control">
+            <span id="zoomLevel">100%</span>
+            <input type="range" class="zoom-slider" id="zoomSlider" min="25" max="200" value="100">
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentTool = 'pencil';
+        let brushSize = 2;
+        let color1 = '#000000';
+        let color2 = '#ffffff';
+        let isDrawing = false;
+        let shapeStartX, shapeStartY;
+        let savedCanvasData = null;
+        let zoomLevel = 100;
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_UNDO = 30;
+
+        const defaultColors = ['#000000','#404040','#808080','#c0c0c0','#ffffff','#800000','#ff0000','#ff8000','#ffff00','#00ff00','#008000','#00ffff','#008080','#0000ff','#000080','#800080','#ff00ff','#ffc0cb'];
+
+        function init() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            saveState();
+            buildColorPalette();
+            updateColorIndicators();
+            attachEvents();
+            updateCanvasSizeDisplay();
+        }
+
+        function saveState() {
+            undoStack.push(canvas.toDataURL());
+            if (undoStack.length > MAX_UNDO) undoStack.shift();
+            redoStack = [];
+        }
+
+        function undo() {
+            if (undoStack.length > 1) {
+                redoStack.push(undoStack.pop());
+                restoreFromDataURL(undoStack[undoStack.length - 1]);
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                const next = redoStack.pop();
+                undoStack.push(next);
+                restoreFromDataURL(next);
+            }
+        }
+
+        function restoreFromDataURL(dataURL) {
+            const img = new Image();
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            };
+            img.src = dataURL;
+        }
+
+        function buildColorPalette() {
+            const palette = document.getElementById('colorPalette');
+            palette.innerHTML = '';
+            defaultColors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch';
+                swatch.style.backgroundColor = color;
+                swatch.onclick = () => { color1 = color; customColorPicker.value = color; updateColorIndicators(); updateSwatchSelection(); };
+                swatch.oncontextmenu = (e) => { e.preventDefault(); color2 = color; updateColorIndicators(); };
+                palette.appendChild(swatch);
+            });
+            updateSwatchSelection();
+        }
+
+        function updateSwatchSelection() {
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected-color'));
+            document.querySelectorAll('.color-swatch').forEach(s => {
+                if (rgbToHex(s.style.backgroundColor) === color1.toLowerCase()) s.classList.add('selected-color');
+            });
+        }
+
+        function rgbToHex(rgb) {
+            if (!rgb || rgb === 'transparent') return '';
+            const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            if (match) return '#' + [match[1], match[2], match[3]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+            return rgb;
+        }
+
+        function updateColorIndicators() {
+            document.getElementById('color1Box').style.backgroundColor = color1;
+            document.getElementById('color2Box').style.backgroundColor = color2;
+            customColorPicker.value = color1;
+        }
+
+        function updateCanvasSizeDisplay() {
+            document.getElementById('canvasSize').textContent = `${canvas.width}×${canvas.height}`;
+            document.getElementById('zoomLevel').textContent = `${zoomLevel}%`;
+        }
+
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let cx, cy;
+            if (e.touches) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+            else { cx = e.clientX; cy = e.clientY; }
+            return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
+        }
+
+        function startDraw(e) {
+            e.preventDefault();
+            const { x, y } = getCanvasCoords(e);
+            if (currentTool === 'fill') {
+                floodFill(Math.floor(x), Math.floor(y), color1);
+                saveState();
+                return;
+            }
+            if (currentTool === 'picker') {
+                pickColor(x, y);
+                return;
+            }
+            if (currentTool !== 'pencil' && currentTool !== 'brush' && currentTool !== 'eraser') {
+                shapeStartX = x; shapeStartY = y;
+                savedCanvasData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                isDrawing = true;
+                return;
+            }
+            isDrawing = true;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.strokeStyle = color1;
+            ctx.fillStyle = color2;
+            ctx.lineWidth = (currentTool === 'eraser') ? brushSize * 2 : brushSize;
+            if (currentTool === 'eraser') ctx.strokeStyle = '#ffffff';
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const { x, y } = getCanvasCoords(e);
+            if (currentTool !== 'pencil' && currentTool !== 'brush' && currentTool !== 'eraser') {
+                if (savedCanvasData) {
+                    ctx.putImageData(savedCanvasData, 0, 0);
+                    drawShape(shapeStartX, shapeStartY, x, y);
+                }
+                return;
+            }
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        function stopDraw(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            if (currentTool !== 'pencil' && currentTool !== 'brush' && currentTool !== 'eraser') {
+                const { x, y } = getCanvasCoords(e);
+                if (savedCanvasData) {
+                    ctx.putImageData(savedCanvasData, 0, 0);
+                    drawShape(shapeStartX, shapeStartY, x, y);
+                }
+                savedCanvasData = null;
+                saveState();
+            } else {
+                ctx.closePath();
+                saveState();
+            }
+        }
+
+        function drawShape(x1, y1, x2, y2) {
+            const w = x2 - x1;
+            const h = y2 - y1;
+            ctx.beginPath();
+            ctx.strokeStyle = color1;
+            ctx.fillStyle = color2;
+            ctx.lineWidth = brushSize;
+
+            if (currentTool === 'rectangle') ctx.rect(x1, y1, w, h);
+            else if (currentTool === 'ellipse') ctx.ellipse(x1 + w/2, y1 + h/2, Math.abs(w)/2, Math.abs(h)/2, 0, 0, Math.PI * 2);
+            else if (currentTool === 'line') { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+            else if (currentTool === 'triangle') drawTriangle(ctx, x1, y1, w, h);
+            else if (currentTool === 'diamond') drawDiamond(ctx, x1, y1, w, h);
+            else if (currentTool === 'star') drawStar(ctx, x1, y1, w, h);
+            else if (currentTool === 'cloud') drawCloud(ctx, x1, y1, w, h);
+            else if (currentTool === 'heart') drawHeart(ctx, x1, y1, w, h);
+            else if (currentTool === 'arrow') drawArrow(ctx, x1, y1, w, h);
+            else if (currentTool === 'hexagon') drawHexagon(ctx, x1, y1, w, h);
+            ctx.fill();
+            ctx.stroke();
+        }
+
+        function drawTriangle(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            ctx.moveTo(x + w/2, y);
+            ctx.lineTo(x, y + h);
+            ctx.lineTo(x + w, y + h);
+            ctx.closePath();
+        }
+
+        function drawDiamond(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            ctx.moveTo(x + w/2, y);
+            ctx.lineTo(x + w, y + h/2);
+            ctx.lineTo(x + w/2, y + h);
+            ctx.lineTo(x, y + h/2);
+            ctx.closePath();
+        }
+
+        function drawStar(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            const outerR = Math.min(w, h) / 2;
+            const innerR = outerR / 2;
+            let rot = Math.PI / 2 * 3;
+            const step = Math.PI / 5;
+            const cx = x + w/2;
+            const cy = y + h/2;
+            ctx.moveTo(cx + outerR * Math.cos(rot), cy + outerR * Math.sin(rot));
+            for (let i = 0; i < 5; i++) {
+                rot += step;
+                ctx.lineTo(cx + innerR * Math.cos(rot), cy + innerR * Math.sin(rot));
+                rot += step;
+                ctx.lineTo(cx + outerR * Math.cos(rot), cy + outerR * Math.sin(rot));
+            }
+            ctx.closePath();
+        }
+
+        function drawCloud(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            const cx = x + w/2;
+            const cy = y + h/2;
+            const rad = Math.min(w, h) / 3;
+            ctx.ellipse(cx - rad, cy - rad/2, rad, rad, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy - rad, rad, rad, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + rad, cy - rad/2, rad, rad, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx - rad, cy + rad/2, rad, rad, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy + rad, rad, rad, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + rad, cy + rad/2, rad, rad, 0, 0, Math.PI * 2);
+        }
+
+        function drawHeart(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            const cx = x + w/2;
+            const cy = y + h/2;
+            const size = Math.min(w, h) / 2;
+            ctx.moveTo(cx, cy + size/2);
+            ctx.bezierCurveTo(cx - size, cy - size/2, cx - size/1.5, cy - size, cx, cy - size/3);
+            ctx.bezierCurveTo(cx + size/1.5, cy - size, cx + size, cy - size/2, cx, cy + size/2);
+        }
+
+        function drawArrow(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            const head = Math.min(w, h) / 3;
+            ctx.moveTo(x, y + h/2);
+            ctx.lineTo(x + w - head, y + h/2);
+            ctx.lineTo(x + w - head, y);
+            ctx.lineTo(x + w, y + h/2);
+            ctx.lineTo(x + w - head, y + h);
+            ctx.lineTo(x + w - head, y + h/2);
+        }
+
+        function drawHexagon(ctx, x, y, w, h) {
+            if (w < 0) { x += w; w = -w; }
+            if (h < 0) { y += h; h = -h; }
+            const cx = x + w/2;
+            const cy = y + h/2;
+            const r = Math.min(w, h) / 2;
+            for (let i = 0; i < 6; i++) {
+                const angle = i * Math.PI / 3;
+                const px = cx + r * Math.cos(angle);
+                const py = cy + r * Math.sin(angle);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+        }
+
+        function floodFill(sx, sy, fillColor) {
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            const target = getPixelColor(data, sx, sy, canvas.width);
+            const fillRGB = hexToRgb(fillColor);
+            if (!fillRGB || colorsMatch(target, fillRGB)) return;
+            const stack = [[sx, sy]];
+            const visited = new Set();
+            while (stack.length) {
+                const [x, y] = stack.pop();
+                const key = `${x},${y}`;
+                if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height || visited.has(key)) continue;
+                if (!colorsMatch(getPixelColor(data, x, y, canvas.width), target)) continue;
+                visited.add(key);
+                setPixelColor(data, x, y, canvas.width, fillRGB);
+                stack.push([x+1, y], [x-1, y], [x, y+1], [x, y-1]);
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function getPixelColor(data, x, y, w) {
+            const idx = (y * w + x) * 4;
+            return { r: data[idx], g: data[idx+1], b: data[idx+2] };
+        }
+        function setPixelColor(data, x, y, w, c) {
+            const idx = (y * w + x) * 4;
+            data[idx] = c.r; data[idx+1] = c.g; data[idx+2] = c.b; data[idx+3] = 255;
+        }
+        function colorsMatch(c1, c2) { return c1.r === c2.r && c1.g === c2.g && c1.b === c2.b; }
+        function hexToRgb(hex) {
+            const res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return res ? { r: parseInt(res[1],16), g: parseInt(res[2],16), b: parseInt(res[3],16) } : null;
+        }
+        function pickColor(x, y) {
+            const p = ctx.getImageData(x, y, 1, 1).data;
+            const hex = '#' + [p[0], p[1], p[2]].map(v => v.toString(16).padStart(2,'0')).join('');
+            color1 = hex;
+            customColorPicker.value = hex;
+            updateColorIndicators();
+            updateSwatchSelection();
+        }
+
+        function saveImageToGallery() {
+            try {
+                const dataURL = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                const filename = `paint_${Date.now()}.png`;
+                link.download = filename;
+                link.href = dataURL;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                alert('✅ تم حفظ الرسمة في مجلد التحميلات');
+            } catch(e) { alert('❌ فشل الحفظ: '+e.message); }
+        }
+
+        function clearCanvas() {
+            if (confirm('مسح الرسمة؟')) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                saveState();
+            }
+        }
+
+        function attachEvents() {
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', draw);
+            canvas.addEventListener('pointerup', stopDraw);
+            canvas.addEventListener('pointerleave', stopDraw);
+            canvas.addEventListener('pointercancel', stopDraw);
+            canvas.addEventListener('pointermove', (e) => {
+                const { x, y } = getCanvasCoords(e);
+                document.getElementById('cursorPos').textContent = `${Math.floor(x)}, ${Math.floor(y)}`;
+            });
+
+            document.querySelectorAll('[data-tool]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-tool], [data-shape]').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    currentTool = btn.dataset.tool;
+                });
+            });
+            document.querySelectorAll('[data-shape]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('[data-tool], [data-shape]').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    currentTool = btn.dataset.shape;
+                });
+            });
+
+            document.getElementById('brushSize').addEventListener('input', (e) => { brushSize = parseInt(e.target.value); document.getElementById('sizeValue').textContent = brushSize; });
+            customColorPicker.addEventListener('input', (e) => { color1 = e.target.value; updateColorIndicators(); updateSwatchSelection(); });
+            document.getElementById('color1Box').onclick = () => { let t=color1; color1=color2; color2=t; updateColorIndicators(); };
+            document.getElementById('color2Box').onclick = () => { let t=color1; color1=color2; color2=t; updateColorIndicators(); };
+            zoomSlider.addEventListener('input', (e) => { zoomLevel = parseInt(e.target.value); canvas.style.transform = `scale(${zoomLevel/100})`; updateCanvasSizeDisplay(); });
+            document.getElementById('menuNew').onclick = clearCanvas;
+            document.getElementById('menuSave').onclick = saveImageToGallery;
+            document.getElementById('menuUndo').onclick = () => undo();
+            document.getElementById('menuRedo').onclick = () => redo();
+            document.getElementById('closeBtn').onclick = () => { if(confirm('إغلاق؟')) window.close(); };
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+                if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+                if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveImageToGallery(); }
+            });
+        }
+
+        init();
+    })();
+</script>
+</body>
+</html>
