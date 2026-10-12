@@ -1,0 +1,2206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>ClassBoard — لوحة جماعية</title>
+<link rel="manifest" href='data:application/manifest+json,{"name":"ClassBoard","short_name":"ClassBoard","start_url":"./","display":"standalone","background_color":"%230d1117","theme_color":"%231f6feb","orientation":"any","lang":"ar","dir":"rtl"}'>
+<style>
+  :root{
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+  * {
+    margin: 0; padding: 0; box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none;
+  }
+  html, body {
+    height: 100%; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+    background: #0d1117; color: #e6edf3;
+  }
+  .app {
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    background: #0d1117;
+  }
+
+  /* ============ شريط الأدوات ============ */
+  .toolbar {
+    display: flex; align-items: center;
+    padding: 6px 10px; padding-top: calc(6px + var(--safe-top));
+    gap: 6px;
+    background: #161b22;
+    border-bottom: 1px solid #1c2128;
+    overflow-x: auto; flex-shrink: 0;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar { display: none; }
+
+  .tb-btn {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .tb-btn:hover { background: #30363d; }
+  .tb-btn:active { transform: scale(0.93); }
+  .tb-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tb-btn.danger { color: #f85149; }
+  .tb-btn.active {
+    background: #1f6feb; border-color: #388bfd; color: #fff;
+  }
+  .tb-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .divider { width: 1px; height: 28px; background: #30363d; flex-shrink: 0; margin: 0 2px; }
+
+  /* ============ منطقة الرسم ============ */
+  .canvas-area {
+    flex: 1; position: relative;
+    background: #0d1117; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .canvas-container {
+    position: relative;
+    width: 100%; height: 100%;
+    background: #f5f5f5;
+    box-shadow: 0 0 0 1px #30363d;
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+
+  /* ============ لوحة الأشكال ============ */
+  .shapes-panel {
+    display: none;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 12px;
+    z-index: 50; max-height: 60vh; overflow-y: auto;
+    grid-template-columns: repeat(6, 1fr); gap: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+  }
+  .shapes-panel.open { display: grid; }
+  .shape-item {
+    aspect-ratio: 1; border-radius: 10px;
+    background: #21262d; border: 1.5px solid #30363d;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.15s; padding: 8px;
+  }
+  .shape-item:hover { background: #30363d; }
+  .shape-item.active { background: #1f6feb; border-color: #388bfd; }
+  .shape-item svg {
+    width: 100%; height: 100%;
+    max-width: 32px; max-height: 32px;
+    fill: none; stroke: #c9d1d9;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
+  .shape-item.active svg { stroke: #fff; }
+
+  /* ============ الشريط السفلي ============ */
+  .bottom-bar {
+    display: flex; align-items: center;
+    padding: 8px 10px; padding-bottom: calc(8px + var(--safe-bottom));
+    gap: 8px;
+    background: #161b22;
+    border-top: 1px solid #1c2128;
+    flex-shrink: 0; overflow-x: auto; scrollbar-width: none;
+  }
+  .bottom-bar::-webkit-scrollbar { display: none; }
+
+  .size-slider {
+    display: flex; align-items: center; gap: 6px;
+    background: #21262d; border: 1px solid #30363d;
+    border-radius: 10px; padding: 4px 10px; flex-shrink: 0;
+  }
+  .size-slider input[type="range"] {
+    -webkit-appearance: none; width: 70px; height: 3px;
+    background: #30363d; border-radius: 2px; outline: none;
+  }
+  .size-slider input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: #1f6feb;
+    border: 2px solid #fff; cursor: pointer;
+  }
+  .size-slider input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #1f6feb; border: 2px solid #fff; cursor: pointer;
+  }
+
+  .palette { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .color-dot {
+    width: 30px; height: 30px; border-radius: 50%;
+    cursor: pointer; border: 2px solid transparent;
+    flex-shrink: 0; transition: transform 0.15s, border-color 0.15s;
+  }
+  .color-dot:hover { transform: scale(1.1); }
+  .color-dot.active {
+    border-color: #fff;
+    box-shadow: 0 0 0 2px #1f6feb, 0 0 12px rgba(31,111,235,0.7);
+    transform: scale(1.1);
+  }
+
+  .color-picker-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    cursor: pointer; flex-shrink: 0;
+    background: conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+    border: 2px solid #30363d; position: relative; overflow: hidden;
+  }
+  .color-picker-circle input {
+    position: absolute; inset: -10px;
+    width: 200%; height: 200%; opacity: 0; cursor: pointer;
+  }
+
+  /* ============ نافذة إدخال النص ============ */
+  .text-modal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .text-modal.open { display: flex; }
+  .text-modal-box {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 16px;
+    padding: 20px;
+    width: 100%; max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    direction: rtl;
+  }
+  .text-modal-box h3 {
+    font-size: 16px; margin-bottom: 14px; color: #e6edf3;
+    font-weight: 600;
+  }
+  .text-modal-box textarea {
+    width: 100%; min-height: 100px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    color: #e6edf3;
+    padding: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .text-modal-box textarea:focus { border-color: #1f6feb; }
+  .text-modal-actions {
+    display: flex; gap: 10px; margin-top: 14px;
+    justify-content: flex-start;
+  }
+  .text-modal-actions button {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .text-modal-actions .btn-primary {
+    background: #1f6feb; color: #fff;
+  }
+  .text-modal-actions .btn-primary:hover { background: #388bfd; }
+  .text-modal-actions .btn-cancel {
+    background: #21262d; color: #c9d1d9;
+    border: 1px solid #30363d;
+  }
+  .text-modal-actions .btn-cancel:hover { background: #30363d; }
+
+  /* ============ إشعار ============ */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #238636; color: #fff;
+    padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 2000; pointer-events: none; white-space: nowrap;
+    max-width: 90vw;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: #da3633; }
+
+  /* ============ شاشة اللوبي ============ */
+  #lobby {
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at 20% 20%, rgba(31,111,235,.18) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(56,139,253,.12) 0%, transparent 50%),
+                #0d1117;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; z-index: 100;
+    padding-top: calc(16px + var(--safe-top)); padding-bottom: calc(16px + var(--safe-bottom));
+    overflow-y: auto;
+  }
+  .lobby-card {
+    width: 100%; max-width: 440px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    animation: cardIn .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+  .lobby-logo {
+    width: 64px; height: 64px;
+    margin: 0 auto 14px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 30px rgba(31,111,235,.4);
+  }
+  .lobby-logo svg { width: 34px; height: 34px; stroke: #fff; fill: none; stroke-width: 2; }
+  .lobby-card h1 { text-align: center; font-size: 22px; margin-bottom: 4px; font-weight: 700; }
+  .lobby-card .sub { text-align: center; color: #8b949e; font-size: 12.5px; margin-bottom: 20px; }
+
+  .tabs { display: flex; background: #0d1117; border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+  .tab {
+    flex: 1; padding: 11px; text-align: center; border-radius: 9px;
+    font-size: 13px; font-weight: 600; color: #8b949e; cursor: pointer;
+    transition: .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tab.active { background: #1f6feb; color: #fff; }
+  .tab svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 6px; font-weight: 600; }
+  .field input {
+    width: 100%; padding: 14px 16px;
+    background: #0d1117; border: 1.5px solid #30363d;
+    border-radius: 12px; color: #e6edf3;
+    font-size: 16px; outline: none; transition: .2s;
+    font-family: inherit;
+  }
+  .field input:focus { border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,.15); }
+  .field input::placeholder { color: #6e7681; }
+
+  .btn-lobby-primary {
+    width: 100%; padding: 15px; border-radius: 12px;
+    background: linear-gradient(135deg, #1f6feb, #388bfd); color: #fff;
+    font-weight: 700; font-size: 15px; margin-bottom: 10px;
+    box-shadow: 0 6px 20px rgba(31,111,235,.35);
+    cursor: pointer; border: none; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: .15s;
+  }
+  .btn-lobby-primary:hover { transform: translateY(-1px); }
+  .btn-lobby-primary:active { transform: scale(.98); }
+  .btn-lobby-primary svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .btn-lobby-secondary {
+    width: 100%; padding: 14px; border-radius: 12px;
+    background: #21262d; border: 1.5px solid #30363d;
+    color: #e6edf3; font-weight: 600; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: .15s;
+  }
+  .btn-lobby-secondary:hover { background: #30363d; }
+  .btn-lobby-secondary:active { transform: scale(.98); }
+  .btn-lobby-secondary svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .lobby-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: #8b949e; font-size: 12px; }
+  .lobby-divider::before, .lobby-divider::after { content:''; flex:1; height:1px; background:#30363d; }
+
+  /* ============ لوحة الأعضاء ============ */
+  .members-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(300px, 85vw);
+    background: #161b22;
+    border-left: 1px solid #30363d;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    z-index: 150;
+    box-shadow: -10px 0 30px rgba(0,0,0,.6);
+    padding-top: var(--safe-top); padding-bottom: var(--safe-bottom);
+  }
+  .members-panel.show { transform: translateX(0); }
+  .panel-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    opacity: 0; pointer-events: none; transition: .28s; z-index: 140;
+  }
+  .panel-overlay.show { opacity: 1; pointer-events: auto; }
+  .members-header {
+    padding: 14px 16px; border-bottom: 1px solid #30363d;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .members-header h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .members-header h3 svg { width: 18px; height: 18px; stroke: #1f6feb; fill: none; stroke-width: 2; }
+  .members-header .count {
+    background: #1f6feb; color: #fff; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 10px;
+  }
+  .close-panel {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: #0d1117; border: 1px solid #30363d;
+    display: flex; align-items: center; justify-content: center;
+    color: #c9d1d9; cursor: pointer;
+  }
+  .close-panel svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .members-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .member-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 10px; margin-bottom: 4px;
+    border: 1px solid transparent;
+  }
+  .member-item.me { background: rgba(31,111,235,.08); border-color: rgba(31,111,235,.3); }
+  .member-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #1f6feb, #388bfd);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 15px;
+    flex-shrink: 0; position: relative;
+  }
+  .member-avatar .online-dot {
+    position: absolute; bottom: 0; right: 0;
+    width: 10px; height: 10px; background: #3fb950;
+    border: 2px solid #161b22; border-radius: 50%;
+  }
+  .member-info { flex: 1; min-width: 0; }
+  .member-info .name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .member-info .joined { font-size: 11.5px; color: #8b949e; margin-top: 2px; }
+
+  /* ============ نافذة المشاركة ============ */
+  .share-panel {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 300; padding: 16px;
+  }
+  .share-panel.show { display: flex; }
+  .share-card {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 18px; padding: 22px;
+    max-width: 400px; width: 100%; text-align: center;
+    max-height: 100%; overflow-y: auto;
+  }
+  .share-card h2 { font-size: 17px; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .share-card h2 svg { width: 20px; height: 20px; stroke: #1f6feb; fill: none; stroke-width: 2; }
+  .share-card p { color: #8b949e; font-size: 12.5px; margin-bottom: 16px; }
+
+  .share-code {
+    background: #0d1117; border: 1.5px solid #30363d; border-radius: 12px;
+    padding: 14px; margin-bottom: 12px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: .15s;
+  }
+  .share-code:active { background: #21262d; }
+  .share-code .code-text { font-family: monospace; font-weight: 700; font-size: 22px; letter-spacing: 6px; color: #58a6ff; }
+
+  .share-link {
+    background: #0d1117; border: 1.5px dashed #1f6feb;
+    border-radius: 12px; padding: 12px;
+    font-family: monospace; font-size: 11.5px;
+    word-break: break-all; margin-bottom: 12px;
+    color: #58a6ff; cursor: pointer;
+  }
+  .share-qr { background: #fff; padding: 10px; border-radius: 12px; display: inline-block; margin-bottom: 14px; }
+  .share-qr img { display: block; width: min(180px, 50vw); height: min(180px, 50vw); }
+
+  .share-actions { display: flex; gap: 8px; }
+  .share-actions button {
+    flex: 1; padding: 13px; border-radius: 10px; font-weight: 600; font-size: 14px;
+    transition: .15s; cursor: pointer; border: none; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .share-actions button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+  .share-actions .btn-copy { background: #1f6feb; color: #fff; }
+  .share-actions .btn-close-share { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+
+  /* ============ قارئ QR ============ */
+  .scanner-modal {
+    position: fixed; inset: 0; background: #000;
+    display: none; flex-direction: column; z-index: 400;
+  }
+  .scanner-modal.show { display: flex; }
+  .scanner-header {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: 14px 16px; padding-top: calc(14px + var(--safe-top));
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(180deg,rgba(0,0,0,.8),transparent);
+    z-index: 2;
+  }
+  .scanner-header button {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.2);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .scanner-header button svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+  .scanner-header .title { color: #fff; font-size: 16px; font-weight: 600; flex: 1; }
+  .scanner-video-wrap { flex: 1; position: relative; overflow: hidden; }
+  #scannerVideo { width: 100%; height: 100%; object-fit: cover; }
+  .scanner-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .scanner-frame {
+    width: min(70vw, 280px); height: min(70vw, 280px);
+    border: 3px solid #fff; border-radius: 20px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.6);
+    position: relative;
+  }
+  .scanner-frame::before, .scanner-frame::after {
+    content:''; position: absolute; width: 30px; height: 30px; border: 4px solid #1f6feb;
+  }
+  .scanner-frame::before { top: -4px; left: -4px; border-right: none; border-bottom: none; border-radius: 20px 0 0 0; }
+  .scanner-frame::after { bottom: -4px; right: -4px; border-left: none; border-top: none; border-radius: 0 0 20px 0; }
+  .scanner-hint {
+    position: absolute; bottom: 30px; left: 0; right: 0;
+    text-align: center; color: #fff; font-size: 14px; font-weight: 500;
+    text-shadow: 0 2px 8px rgba(0,0,0,.8); padding: 0 20px;
+  }
+
+  @media (min-width: 600px) {
+    .shapes-panel { grid-template-columns: repeat(12, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== اللوبي ==================== -->
+<div id="lobby">
+  <div class="lobby-card">
+    <div class="lobby-logo">
+      <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+    </div>
+    <h1>ClassBoard</h1>
+    <p class="sub">لوحة جماعية — ارسم، شارك، تعاون</p>
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('create',this)">
+        <svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
+        إنشاء
+      </div>
+      <div class="tab" onclick="switchTab('join',this)">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        انضمام
+      </div>
+    </div>
+
+    <div id="createTab">
+      <div class="field">
+        <label>اسمك</label>
+        <input id="creatorName" placeholder="مثال: أحمد" maxlength="30" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>اسم اللوحة (اختياري)</label>
+        <input id="roomTitle" placeholder="مثال: حصة الرياضيات" maxlength="40" autocomplete="off">
+      </div>
+      <button class="btn-lobby-primary" onclick="createRoom()">
+        <svg viewBox="0 0 24 24"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
+        إنشاء لوحة جديدة
+      </button>
+    </div>
+
+    <div id="joinTab" style="display:none">
+      <div class="field">
+        <label>اسمك</label>
+        <input id="joinerName" placeholder="مثال: سارة" maxlength="30" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>كود اللوحة</label>
+        <input id="joinCode" placeholder="ABC123" maxlength="6"
+          style="text-transform:uppercase;letter-spacing:6px;text-align:center;font-family:monospace;font-size:18px;font-weight:700"
+          autocomplete="off">
+      </div>
+      <button class="btn-lobby-primary" onclick="joinRoom()">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        انضمام بكود
+      </button>
+      <button class="btn-lobby-secondary" onclick="openScanner()" style="margin-top:8px">
+        <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        مسح QR
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== التطبيق ==================== -->
+<div class="app" id="app" style="display:none;">
+
+  <div class="toolbar">
+    <button class="tb-btn" id="membersBtn" title="الأعضاء">
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </button>
+    <button class="tb-btn" id="shareBtn" title="مشاركة">
+      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+    </button>
+    <button class="tb-btn" id="downloadBtn" title="تحميل">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+    <button class="tb-btn danger" id="clearBtn" title="مسح الكل">
+      <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    </button>
+
+    <div class="divider"></div>
+
+    <button class="tb-btn" id="undoBtn" title="تراجع" disabled>
+      <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button class="tb-btn" id="redoBtn" title="إعادة" disabled>
+      <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+    </button>
+
+    <div class="divider"></div>
+
+    <button class="tb-btn" id="shapesBtn" title="الأشكال">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><path d="M6.5 21l3.5-7 3.5 7z"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="tb-btn" id="textBtn" title="إضافة نص">
+      <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+    </button>
+    <button class="tb-btn" id="imageBtn" title="إضافة صورة">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </button>
+    <button class="tb-btn" id="selectBtn" title="تحديد / تحريك">
+      <svg viewBox="0 0 24 24"><path d="M3 3l7 18 2.5-7L20 11.5z"/></svg>
+    </button>
+    <button class="tb-btn" id="bucketBtn" title="سطل">
+      <svg viewBox="0 0 24 24"><path d="M19 11l-8-8-8.5 8.5a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0L19 11z"/><path d="M5 2l5 5"/><path d="M20 15s1 1.5 1 3a2 2 0 1 1-4 0c0-1.5 1-3 1-3z"/></svg>
+    </button>
+    <button class="tb-btn" id="eraserBtn" title="ممحاة">
+      <svg viewBox="0 0 24 24"><path d="M20 20H7L3 16a2 2 0 0 1 0-2.8l9.2-9.2a2 2 0 0 1 2.8 0l5 5a2 2 0 0 1 0 2.8L11 20"/><path d="M6 11l7 7"/></svg>
+    </button>
+    <button class="tb-btn active" id="brushBtn" title="فرشاة">
+      <svg viewBox="0 0 24 24"><path d="M9.06 11.9l8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
+    </button>
+  </div>
+
+  <div class="canvas-area">
+    <div class="canvas-container" id="canvasContainer">
+      <canvas id="canvas"></canvas>
+      <div class="shapes-panel" id="shapesPanel"></div>
+    </div>
+  </div>
+
+  <div class="bottom-bar">
+    <div class="size-slider">
+      <input type="range" id="sizeSlider" min="1" max="60" value="4">
+    </div>
+    <div class="palette" id="palette"></div>
+    <div class="color-picker-circle" title="خالط الألوان">
+      <input type="color" id="colorPicker" value="#e91e63">
+    </div>
+  </div>
+
+</div>
+
+<!-- نافذة إدخال النص -->
+<div class="text-modal" id="textModal">
+  <div class="text-modal-box">
+    <h3>✏️ إضافة نص</h3>
+    <textarea id="textInput" placeholder="اكتب النص هنا..." rows="3"></textarea>
+    <div class="text-modal-actions">
+      <button class="btn-primary" id="textConfirm">إضافة</button>
+      <button class="btn-cancel" id="textCancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة المشاركة -->
+<div class="share-panel" id="sharePanel">
+  <div class="share-card">
+    <h2>
+      <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      دعوة الآخرين
+    </h2>
+    <p>شارك بأي طريقة</p>
+    <div class="share-code" onclick="copyShareCode()">
+      <span class="code-text" id="shareCodeText">------</span>
+    </div>
+    <div class="share-link" onclick="copyShareLink()" id="shareLinkText">...</div>
+    <div class="share-qr"><img id="qrImage" alt="QR"></div>
+    <div class="share-actions">
+      <button class="btn-close-share" onclick="closeShare()">إغلاق</button>
+      <button class="btn-copy" onclick="copyShareLink()">
+        <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        نسخ الرابط
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- لوحة الأعضاء -->
+<div class="panel-overlay" id="panelOverlay" onclick="toggleMembersPanel()"></div>
+<div class="members-panel" id="membersPanel">
+  <div class="members-header">
+    <h3>
+      <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      الحاضرون
+      <span class="count" id="membersCount">0</span>
+    </h3>
+    <button class="close-panel" onclick="toggleMembersPanel()">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="members-list" id="membersList"></div>
+</div>
+
+<!-- قارئ QR -->
+<div class="scanner-modal" id="scannerModal">
+  <div class="scanner-header">
+    <button onclick="closeScanner()">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <div class="title">مسح رمز QR</div>
+  </div>
+  <div class="scanner-video-wrap">
+    <video id="scannerVideo" playsinline autoplay muted></video>
+    <div class="scanner-overlay">
+      <div class="scanner-frame"></div>
+    </div>
+    <div class="scanner-hint">وجّه الكاميرا نحو رمز QR</div>
+  </div>
+</div>
+
+<input type="file" id="imageInput" accept="image/*" style="display:none">
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getDatabase, ref, push, onValue, get, set, remove, update, onDisconnect,
+  onChildAdded, onChildRemoved
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ==================== Firebase ====================
+const firebaseConfig = { databaseURL: "https://rassam-df444-default-rtdb.firebaseio.com/" };
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ==================== الحالة العامة ====================
+let me = null;
+let room = null;
+let unsubscribers = [];
+let cleanupTimer = null;
+let scannerStream = null, scanRAF = null;
+let allMembers = {};
+let membersPanelOpen = false;
+
+// ==================== دمج Firebase ====================
+// سنستخدم الحالة الموجودة في الكود الأصلي + نضيف عناصر Firebase
+let isRemoteUpdate = false; // لتجنب إعادة الإرسال
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const genId = () => 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+const genCode = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let c = '';
+  for(let i=0;i<6;i++) c += chars[Math.floor(Math.random()*chars.length)];
+  return c;
+};
+
+function toast(msg, isError){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+// ==================== اللوبي ====================
+window.switchTab = function(tab, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  $('createTab').style.display = tab === 'create' ? 'block' : 'none';
+  $('joinTab').style.display = tab === 'join' ? 'block' : 'none';
+};
+
+window.createRoom = async function(){
+  const name = $('creatorName').value.trim();
+  const title = $('roomTitle').value.trim() || 'لوحة بدون اسم';
+  if(!name) return toast('اكتب اسمك', true);
+  const code = genCode();
+  const myId = genId();
+  const roomData = { code, title, createdAt: Date.now() };
+  try {
+    await set(ref(db, 'rooms/' + code), roomData);
+    await set(ref(db, `rooms/${code}/members/${myId}`), { name, joinedAt: Date.now() });
+    me = { id: myId, name, roomCode: code };
+    room = roomData;
+    onDisconnect(ref(db, `rooms/${code}/members/${myId}`)).remove();
+    startApp();
+  } catch(e){ console.error(e); toast('❌ فشل الاتصال', true); }
+};
+
+window.joinRoom = async function(){
+  const name = $('joinerName').value.trim();
+  const code = $('joinCode').value.trim().toUpperCase();
+  if(!name) return toast('اكتب اسمك', true);
+  if(!code || code.length < 4) return toast('اكتب كود اللوحة', true);
+  try {
+    const snap = await get(ref(db, 'rooms/' + code));
+    if(!snap.exists()) return toast('❌ اللوحة غير موجودة', true);
+    const roomData = snap.val();
+    const myId = genId();
+    await set(ref(db, `rooms/${code}/members/${myId}`), { name, joinedAt: Date.now() });
+    me = { id: myId, name, roomCode: code };
+    room = roomData;
+    onDisconnect(ref(db, `rooms/${code}/members/${myId}`)).remove();
+    startApp();
+  } catch(e){ console.error(e); toast('❌ فشل الاتصال', true); }
+};
+
+// ==================== التشغيل ====================
+function startApp(){
+  $('lobby').style.display = 'none';
+  $('app').style.display = 'flex';
+  initApp();
+  subscribeToMembers();
+  subscribeToFirebase();
+  watchCleanup();
+  cleanupOldRooms();
+}
+
+// ==================== Firebase subscriptions ====================
+function subscribeToFirebase(){
+  // اشترك في الرسم (الطبقة الأساسية) - Snapshot كامل
+  const unsub1 = onValue(ref(db, `rooms/${me.roomCode}/snapshot`), (snap)=>{
+    const dataURL = snap.val();
+    if(!dataURL) return;
+    if(isRemoteUpdate) return;
+    isRemoteUpdate = true;
+    const img = new Image();
+    img.onload = () => {
+      baseCtx.fillStyle = '#ffffff';
+      baseCtx.fillRect(0, 0, baseLayer.width, baseLayer.height);
+      baseCtx.drawImage(img, 0, 0, baseLayer.width / (window.devicePixelRatio||1), baseLayer.height / (window.devicePixelRatio||1));
+      renderAll();
+      isRemoteUpdate = false;
+    };
+    img.onerror = () => { isRemoteUpdate = false; };
+    img.src = dataURL;
+  });
+  unsubscribers.push(unsub1);
+
+  // اشترك في العناصر (أشكال، نصوص، صور)
+  const unsub2 = onValue(ref(db, `rooms/${me.roomCode}/elements`), (snap)=>{
+    const data = snap.val() || {};
+    if(isRemoteUpdate) return;
+    isRemoteUpdate = true;
+    // احذف العناصر التي لم تعد موجودة
+    placedItems = placedItems.filter(it => data[it.firebaseId]);
+    // أضف/حدّث العناصر
+    Object.keys(data).forEach(fid => {
+      const remote = data[fid];
+      const existing = placedItems.find(it => it.firebaseId === fid);
+      if(existing){
+        // حدّث خصائص بدون إعادة تحميل الصور (للحفاظ على الأداء)
+        existing.x = remote.x; existing.y = remote.y;
+        existing.w = remote.w; existing.h = remote.h;
+        existing.rotation = remote.rotation;
+        existing.color = remote.color;
+        if(remote.type === 'text'){
+          existing.text = remote.text;
+          existing.fontSize = remote.fontSize;
+        }
+      } else {
+        // عنصر جديد
+        if(remote.type === 'shape'){
+          placedItems.push({
+            firebaseId: fid,
+            id: Date.now() + Math.random(),
+            type: 'shape',
+            shapeId: remote.shapeId,
+            x: remote.x, y: remote.y, w: remote.w, h: remote.h,
+            rotation: remote.rotation || 0,
+            color: remote.color,
+            lineWidth: remote.lineWidth || 4
+          });
+        } else if(remote.type === 'text'){
+          placedItems.push({
+            firebaseId: fid,
+            id: Date.now() + Math.random(),
+            type: 'text',
+            text: remote.text,
+            x: remote.x, y: remote.y, w: remote.w, h: remote.h,
+            rotation: remote.rotation || 0,
+            color: remote.color,
+            fontSize: remote.fontSize || 24
+          });
+        } else if(remote.type === 'image'){
+          // حمّل الصورة من dataURL
+          const img = new Image();
+          img.onload = () => {
+            placedItems.push({
+              firebaseId: fid,
+              id: Date.now() + Math.random(),
+              type: 'image',
+              img: img,
+              x: remote.x, y: remote.y, w: remote.w, h: remote.h,
+              rotation: remote.rotation || 0,
+              color: remote.color,
+              aspectRatio: img.width / img.height
+            });
+            renderAll();
+          };
+          img.src = remote.dataURL;
+        }
+      }
+    });
+    renderAll();
+    isRemoteUpdate = false;
+  });
+  unsubscribers.push(unsub2);
+}
+
+// إرسال طبقة الرسم إلى Firebase (يتم بشكل دوري أثناء الرسم)
+function pushSnapshotToFirebase(){
+  if(isRemoteUpdate) return;
+  const dataURL = canvas.toDataURL('image/png');
+  set(ref(db, `rooms/${me.roomCode}/snapshot`), dataURL).catch(()=>{});
+}
+
+// إرسال عنصر إلى Firebase
+function pushElementToFirebase(it){
+  if(!it.firebaseId){
+    it.firebaseId = 'e_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+  }
+  const data = {
+    type: it.type,
+    x: it.x, y: it.y, w: it.w, h: it.h,
+    rotation: it.rotation,
+    color: it.color
+  };
+  if(it.type === 'shape'){
+    data.shapeId = it.shapeId;
+    data.lineWidth = it.lineWidth;
+  } else if(it.type === 'text'){
+    data.text = it.text;
+    data.fontSize = it.fontSize;
+  } else if(it.type === 'image'){
+    data.dataURL = it.img.src;
+  }
+  set(ref(db, `rooms/${me.roomCode}/elements/${it.firebaseId}`), data).catch(()=>{});
+}
+
+function removeElementFromFirebase(firebaseId){
+  if(!firebaseId) return;
+  remove(ref(db, `rooms/${me.roomCode}/elements/${firebaseId}`)).catch(()=>{});
+}
+
+// ==================== الأعضاء ====================
+function subscribeToMembers(){
+  const membersRef = ref(db, `rooms/${me.roomCode}/members`);
+  const unsubAdd = onChildAdded(membersRef, (snap)=>{
+    const id = snap.key, data = snap.val();
+    allMembers[id] = data;
+    if(id !== me.id) toast(`👋 ${data.name} انضم`);
+    renderMembers();
+  });
+  const unsubChange = onValue(membersRef, (snap)=>{
+    allMembers = snap.val() || {};
+    renderMembers();
+  });
+  const unsubRemove = onChildRemoved(membersRef, (snap)=>{
+    const id = snap.key, data = allMembers[id];
+    delete allMembers[id];
+    if(data && id !== me.id) toast(`🚪 ${data.name} خرج`);
+    renderMembers();
+  });
+  unsubscribers.push(unsubAdd, unsubChange, unsubRemove);
+}
+
+function renderMembers(){
+  const list = $('membersList'); if(!list) return;
+  const entries = Object.entries(allMembers);
+  entries.sort((a,b)=>(a[1].joinedAt||0) - (b[1].joinedAt||0));
+  $('membersCount').textContent = entries.length;
+  if(entries.length === 0){
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#8b949e;font-size:13px">لا يوجد أحد</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([id, m])=>{
+    const isMe = id === me.id;
+    const initial = (m.name||'?').charAt(0).toUpperCase();
+    return `
+      <div class="member-item ${isMe?'me':''}">
+        <div class="member-avatar">${esc(initial)}<span class="online-dot"></span></div>
+        <div class="member-info">
+          <div class="name">${esc(m.name)}${isMe?' <span style="color:#58a6ff;font-size:11px">(أنت)</span>':''}</div>
+          <div class="joined">${m.joinedAt ? 'انضم ' + new Date(m.joinedAt).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'}) : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+window.toggleMembersPanel = function(){
+  membersPanelOpen = !membersPanelOpen;
+  $('membersPanel').classList.toggle('show', membersPanelOpen);
+  $('panelOverlay').classList.toggle('show', membersPanelOpen);
+};
+
+// ==================== المشاركة ====================
+window.shareRoom = function(){
+  const url = `${location.origin}${location.pathname}?room=${me.roomCode}`;
+  $('shareLinkText').textContent = url;
+  $('shareCodeText').textContent = me.roomCode;
+  $('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`;
+  $('sharePanel').classList.add('show');
+};
+window.closeShare = function(){ $('sharePanel').classList.remove('show'); };
+window.copyShareCode = function(){
+  if(navigator.clipboard) navigator.clipboard.writeText(me.roomCode).then(()=>toast('📋 تم نسخ الكود')).catch(()=>toast(me.roomCode));
+  else toast(me.roomCode);
+};
+window.copyShareLink = function(){
+  const url = `${location.origin}${location.pathname}?room=${me.roomCode}`;
+  if(navigator.clipboard) navigator.clipboard.writeText(url).then(()=>toast('📋 تم نسخ الرابط')).catch(()=>toast(url));
+  else toast(url);
+};
+
+// ==================== QR Scanner ====================
+window.openScanner = async function(){
+  $('scannerModal').classList.add('show');
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    $('scannerVideo').srcObject = scannerStream;
+    const jsQR = await loadJsQR();
+    const video = $('scannerVideo');
+    const cv = document.createElement('canvas');
+    const cctx = cv.getContext('2d', { willReadFrequently: true });
+    function tick(){
+      if(video.readyState === video.HAVE_ENOUGH_DATA){
+        cv.width = video.videoWidth;
+        cv.height = video.videoHeight;
+        cctx.drawImage(video, 0, 0, cv.width, cv.height);
+        const imgData = cctx.getImageData(0, 0, cv.width, cv.height);
+        const code = jsQR(imgData.data, imgData.width, imgData.height);
+        if(code && code.data){ handleScannedQR(code.data); return; }
+      }
+      scanRAF = requestAnimationFrame(tick);
+    }
+    tick();
+  } catch(e){ toast('❌ فشل الوصول للكاميرا', true); closeScanner(); }
+};
+
+window.closeScanner = function(){
+  $('scannerModal').classList.remove('show');
+  if(scanRAF){ cancelAnimationFrame(scanRAF); scanRAF = null; }
+  if(scannerStream){ scannerStream.getTracks().forEach(t=>t.stop()); scannerStream = null; }
+  $('scannerVideo').srcObject = null;
+};
+
+function handleScannedQR(data){
+  try {
+    const url = new URL(data);
+    const code = url.searchParams.get('room');
+    if(code){
+      closeScanner();
+      document.querySelectorAll('.tab')[1].click();
+      $('joinCode').value = code.toUpperCase();
+      if(!$('joinerName').value.trim()){ toast('اكتب اسمك ثم اضغط انضمام'); return; }
+      joinRoom();
+      return;
+    }
+  } catch(e){}
+  const cleanCode = data.trim().toUpperCase();
+  if(/^[A-Z0-9]{4,8}$/.test(cleanCode)){
+    closeScanner();
+    document.querySelectorAll('.tab')[1].click();
+    $('joinCode').value = cleanCode;
+    if(!$('joinerName').value.trim()){ toast('اكتب اسمك ثم اضغط انضمام'); return; }
+    joinRoom();
+  } else toast('❌ QR غير صالح', true);
+}
+
+async function loadJsQR(){
+  if(window.jsQR) return window.jsQR;
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+    s.onload = () => resolve(window.jsQR);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+// ==================== التنظيف التلقائي ====================
+function watchCleanup(){
+  const unsub = onValue(ref(db, `rooms/${me.roomCode}/members`), (snap)=>{
+    const members = snap.val() || {};
+    const count = Object.keys(members).length;
+    if(count === 0){
+      if(cleanupTimer) clearTimeout(cleanupTimer);
+      cleanupTimer = setTimeout(async ()=>{
+        const check = await get(ref(db, `rooms/${me.roomCode}/members`));
+        const finalCount = check.exists() ? Object.keys(check.val()).length : 0;
+        if(finalCount === 0){
+          try { await remove(ref(db, 'rooms/' + me.roomCode)); } catch(e){}
+        }
+      }, 5000);
+    } else {
+      if(cleanupTimer){ clearTimeout(cleanupTimer); cleanupTimer = null; }
+    }
+  });
+  unsubscribers.push(unsub);
+}
+
+async function cleanupOldRooms(){
+  try {
+    const snap = await get(ref(db, 'rooms'));
+    if(!snap.exists()) return;
+    const now = Date.now();
+    const DAY = 24*60*60*1000;
+    const rooms = snap.val();
+    for(const [code, r] of Object.entries(rooms)){
+      const age = now - (r.createdAt || 0);
+      const membersSnap = await get(ref(db, `rooms/${code}/members`));
+      const membersCount = membersSnap.exists() ? Object.keys(membersSnap.val()).length : 0;
+      if(age > DAY && membersCount === 0) await remove(ref(db, 'rooms/' + code));
+    }
+  } catch(e){}
+}
+
+// ==================== التشغيل ====================
+window.addEventListener('beforeunload', () => {
+  if(me) remove(ref(db, `rooms/${me.roomCode}/members/${me.id}`));
+});
+
+// ============================================================
+//                  الكود الأصلي (لوحة الرسم)
+// ============================================================
+
+const COLORS = [
+  '#e91e63', '#9c27b0', '#ff9800', '#2196f3',
+  '#4caf50', '#f44336', '#00bcd4', '#795548',
+  '#607d8b', '#ffeb3b', '#3f51b5', '#ffffff'
+];
+
+const SHAPES = [
+  { id: 'line', name: 'خط', d: 'M4 20L20 4' },
+  { id: 'rect', name: 'مستطيل', d: 'M4 6h16v12H4z' },
+  { id: 'circle', name: 'دائرة', d: 'M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16z' },
+  { id: 'triangle', name: 'مثلث', d: 'M12 3l9 18H3z' },
+  { id: 'diamond', name: 'معين', d: 'M12 3l9 9-9 9-9-9z' },
+  { id: 'star', name: 'نجمة', d: 'M12 3l2.6 5.9 6.4.6-4.8 4.3 1.4 6.2L12 16.8 6.4 20l1.4-6.2L3 9.5l6.4-.6z' },
+  { id: 'pentagon', name: 'خماسي', d: 'M12 3l9 6.5-3.4 10.5H6.4L3 9.5z' },
+  { id: 'hexagon', name: 'سداسي', d: 'M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z' },
+  { id: 'octagon', name: 'ثماني', d: 'M8 4h8l4 4v8l-4 4H8l-4-4V8z' },
+  { id: 'arrow', name: 'سهم', d: 'M4 12h14M12 5l7 7-7 7' },
+  { id: 'cross', name: 'صليب', d: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z' },
+  { id: 'heart', name: 'قلب', d: 'M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z' },
+  { id: 'cloud', name: 'سحابة', d: 'M6 18h12a4 4 0 0 0 .6-7.96A6 6 0 0 0 7 9.3 4.5 4.5 0 0 0 6 18z' },
+  { id: 'ellipse', name: 'بيضاوي', d: 'M12 6a8 6 0 1 1 0 12 8 6 0 0 1 0-12z' },
+  { id: 'trapezoid', name: 'شبه منحرف', d: 'M6 6h12l4 12H2z' },
+  { id: 'parallelogram', name: 'متوازي', d: 'M8 6h12l-4 12H4z' },
+  { id: 'roundedRect', name: 'مستطيل دائري', d: 'M7 6h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z' },
+  { id: 'plus', name: 'زائد', d: 'M12 5v14M5 12h14' },
+  { id: 'moon', name: 'هلال', d: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z' },
+  { id: 'sun', name: 'شمس', d: 'M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM12 1v3M12 20v3M1 12h3M20 12h3M4 4l2 2M18 18l2 2M20 4l-2 2M6 18l-2 2' },
+  { id: 'lightning', name: 'برق', d: 'M13 2L4 14h7l-1 8 9-12h-7z' },
+  { id: 'speech', name: 'فقاعة', d: 'M4 5h16v11H9l-5 4z' },
+  { id: 'shield', name: 'درع', d: 'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z' },
+  { id: 'location', name: 'موقع', d: 'M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zM12 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4z' }
+];
+
+// ===== الحالة =====
+let currentTool = 'brush';
+let currentColor = '#e91e63';
+let currentSize = 4;
+let currentShape = null;
+let isDrawing = false;
+let startX = 0, startY = 0, lastX = 0, lastY = 0;
+
+let baseLayer = document.createElement('canvas');
+let baseCtx = baseLayer.getContext('2d', { willReadFrequently: true });
+
+let history = [];
+let historyIndex = -1;
+const MAX_HISTORY = 30;
+
+let placedItems = [];
+let selectedIdx = -1;
+
+let isDragging = false;
+let isRotating = false;
+let isResizing = false;
+let dragOffsetX = 0, dragOffsetY = 0;
+let rotateStartAngle = 0;
+let rotateStartRotation = 0;
+let resizeStartW = 0, resizeStartH = 0;
+let resizeStartX = 0, resizeStartY = 0;
+let resizeStartItemX = 0, resizeStartItemY = 0;
+let resizeCorner = 'br';
+
+let snapshotTimer = null; // مؤقت إرسال الرسم إلى Firebase
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const shapesPanel = document.getElementById('shapesPanel');
+const palette = document.getElementById('palette');
+const sizeSlider = document.getElementById('sizeSlider');
+const colorPicker = document.getElementById('colorPicker');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const shapesBtn = document.getElementById('shapesBtn');
+const textBtn = document.getElementById('textBtn');
+const imageBtn = document.getElementById('imageBtn');
+const selectBtn = document.getElementById('selectBtn');
+const clearBtn = document.getElementById('clearBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const textModal = document.getElementById('textModal');
+const textInput = document.getElementById('textInput');
+const textConfirm = document.getElementById('textConfirm');
+const textCancel = document.getElementById('textCancel');
+const imageInput = document.getElementById('imageInput');
+
+// ============ إعداد Canvas ============
+function resizeCanvas() {
+  const container = canvas.parentElement;
+  const rect = container.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = rect.width, h = rect.height;
+
+  let oldBase = null;
+  if (baseLayer.width > 0 && baseLayer.height > 0) {
+    try { oldBase = baseCtx.getImageData(0, 0, baseLayer.width, baseLayer.height); } catch(e) {}
+  }
+
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  baseLayer.width = w * dpr;
+  baseLayer.height = h * dpr;
+  baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  baseCtx.fillStyle = '#ffffff';
+  baseCtx.fillRect(0, 0, w, h);
+
+  if (oldBase && oldBase.width > 0) {
+    const tmp = document.createElement('canvas');
+    tmp.width = oldBase.width; tmp.height = oldBase.height;
+    tmp.getContext('2d').putImageData(oldBase, 0, 0);
+    baseCtx.drawImage(tmp, 0, 0, oldBase.width / dpr, oldBase.height / dpr);
+  }
+
+  renderAll();
+  saveHistory();
+}
+
+// ============ إعادة رسم ============
+function renderAll() {
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(baseLayer, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  placedItems.forEach((it, i) => {
+    drawPlacedItem(it, i === selectedIdx);
+  });
+}
+
+function drawPlacedItem(it, selected) {
+  ctx.save();
+  const cx = it.x + it.w / 2;
+  const cy = it.y + it.h / 2;
+  ctx.translate(cx, cy);
+  ctx.rotate(it.rotation);
+  ctx.translate(-cx, -cy);
+
+  if (it.type === 'shape') {
+    drawShapeOnCtx(ctx, it.shapeId, it.x, it.y, it.x + it.w, it.y + it.h, it.color, it.lineWidth);
+  } else if (it.type === 'text') {
+    drawTextOnCtx(ctx, it);
+  } else if (it.type === 'image') {
+    drawImageOnCtx(ctx, it);
+  }
+
+  ctx.restore();
+
+  if (selected) drawSelectionBox(it);
+}
+
+function drawTextOnCtx(targetCtx, it) {
+  targetCtx.save();
+  targetCtx.fillStyle = it.color;
+  targetCtx.font = `${it.fontSize}px "Segoe UI", system-ui, sans-serif`;
+  targetCtx.textAlign = 'center';
+  targetCtx.textBaseline = 'middle';
+  const cx = it.x + it.w / 2;
+  const cy = it.y + it.h / 2;
+  targetCtx.fillText(it.text, cx, cy, it.w);
+  targetCtx.restore();
+}
+
+function measureText(text, fontSize) {
+  ctx.save();
+  ctx.font = `${fontSize}px "Segoe UI", system-ui, sans-serif`;
+  const metrics = ctx.measureText(text);
+  ctx.restore();
+  const w = Math.max(40, metrics.width + 20);
+  const h = Math.max(fontSize * 1.4, 30);
+  return { w, h };
+}
+
+function drawImageOnCtx(targetCtx, it) {
+  if (!it.img) return;
+  targetCtx.save();
+  targetCtx.drawImage(it.img, it.x, it.y, it.w, it.h);
+  targetCtx.restore();
+}
+
+function drawSelectionBox(it) {
+  const corners = getItemCorners(it);
+  const cx = it.x + it.w / 2;
+  const cy = it.y + it.h / 2;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(it.rotation);
+  ctx.translate(-cx, -cy);
+
+  ctx.strokeStyle = '#1f6feb';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.strokeRect(it.x - 6, it.y - 6, it.w + 12, it.h + 12);
+  ctx.setLineDash([]);
+
+  corners.forEach(c => {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.strokeStyle = '#1f6feb';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  const rotX = it.x + it.w / 2;
+  const rotY = it.y - 30;
+  ctx.beginPath();
+  ctx.moveTo(it.x + it.w / 2, it.y - 6);
+  ctx.lineTo(rotX, rotY);
+  ctx.strokeStyle = '#1f6feb';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(rotX, rotY, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#1f6feb';
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(rotX, rotY, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function getItemCorners(it) {
+  const cx = it.x + it.w / 2;
+  const cy = it.y + it.h / 2;
+  const cos = Math.cos(it.rotation);
+  const sin = Math.sin(it.rotation);
+  const pts = [
+    { x: it.x, y: it.y },
+    { x: it.x + it.w, y: it.y },
+    { x: it.x + it.w, y: it.y + it.h },
+    { x: it.x, y: it.y + it.h }
+  ];
+  return pts.map(p => {
+    const dx = p.x - cx, dy = p.y - cy;
+    return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+  });
+}
+
+// ============ بناء الألوان ============
+COLORS.forEach((c, i) => {
+  const el = document.createElement('div');
+  el.className = 'color-dot' + (i === 0 ? ' active' : '');
+  el.style.background = c;
+  el.dataset.color = c;
+  el.addEventListener('click', () => {
+    currentColor = c;
+    colorPicker.value = c;
+    document.querySelectorAll('.color-dot').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    if (selectedIdx >= 0) {
+      const it = placedItems[selectedIdx];
+      if (it.type !== 'image') {
+        it.color = c;
+        pushElementToFirebase(it);
+        renderAll();
+        saveHistory();
+      }
+    }
+  });
+  palette.appendChild(el);
+});
+
+// ============ بناء الأشكال ============
+SHAPES.forEach((s) => {
+  const el = document.createElement('div');
+  el.className = 'shape-item';
+  el.title = s.name;
+  el.dataset.shape = s.id;
+  el.innerHTML = `<svg viewBox="0 0 24 24"><path d="${s.d}"/></svg>`;
+  el.addEventListener('click', () => {
+    const wasActive = el.classList.contains('active');
+    document.querySelectorAll('.shape-item').forEach(b => b.classList.remove('active'));
+    if (wasActive) {
+      currentShape = null;
+    } else {
+      currentShape = s.id;
+      el.classList.add('active');
+      if (currentTool !== 'brush' && currentTool !== 'pencil') setTool('brush');
+    }
+  });
+  shapesPanel.appendChild(el);
+});
+
+// ============ شريط الحجم ============
+sizeSlider.addEventListener('input', () => {
+  currentSize = parseInt(sizeSlider.value);
+  if (selectedIdx >= 0) {
+    const it = placedItems[selectedIdx];
+    if (it.type === 'shape') {
+      it.lineWidth = currentSize;
+    } else if (it.type === 'text') {
+      it.fontSize = Math.max(8, currentSize * 4);
+      const m = measureText(it.text, it.fontSize);
+      const oldCx = it.x + it.w / 2;
+      const oldCy = it.y + it.h / 2;
+      it.w = m.w;
+      it.h = m.h;
+      it.x = oldCx - it.w / 2;
+      it.y = oldCy - it.h / 2;
+    }
+    pushElementToFirebase(it);
+    renderAll();
+  }
+});
+
+// ============ الأدوات ============
+function setTool(tool) {
+  currentTool = tool;
+  document.querySelectorAll('.tb-btn').forEach(b => b.classList.remove('active'));
+  const map = { brush: 'brushBtn', pencil: 'brushBtn', bucket: 'bucketBtn', eraser: 'eraserBtn', select: 'selectBtn', text: 'textBtn', image: 'imageBtn' };
+  const btnId = map[tool];
+  if (btnId) document.getElementById(btnId).classList.add('active');
+
+  if (tool === 'bucket' || tool === 'eraser' || tool === 'text' || tool === 'image') {
+    currentShape = null;
+    document.querySelectorAll('.shape-item').forEach(b => b.classList.remove('active'));
+  }
+  if (tool !== 'select') {
+    selectedIdx = -1;
+    renderAll();
+  }
+  canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+}
+
+document.getElementById('brushBtn').addEventListener('click', () => setTool('brush'));
+document.getElementById('bucketBtn').addEventListener('click', () => setTool('bucket'));
+document.getElementById('eraserBtn').addEventListener('click', () => setTool('eraser'));
+selectBtn.addEventListener('click', () => setTool('select'));
+
+// ============ زر النص ============
+textBtn.addEventListener('click', () => {
+  setTool('text');
+  textInput.value = '';
+  textModal.classList.add('open');
+  setTimeout(() => textInput.focus(), 100);
+});
+
+textCancel.addEventListener('click', () => {
+  textModal.classList.remove('open');
+  setTool('select');
+});
+
+textConfirm.addEventListener('click', () => {
+  const txt = textInput.value.trim();
+  if (!txt) { toast('الرجاء كتابة نص', true); return; }
+  textModal.classList.remove('open');
+
+  const fontSize = Math.max(16, currentSize * 4);
+  const m = measureText(txt, fontSize);
+  const canvasRect = canvas.getBoundingClientRect();
+  const centerX = canvasRect.width / 2;
+  const centerY = canvasRect.height / 2;
+
+  const item = {
+    id: Date.now() + Math.random(),
+    type: 'text',
+    text: txt,
+    x: centerX - m.w / 2,
+    y: centerY - m.h / 2,
+    w: m.w,
+    h: m.h,
+    rotation: 0,
+    color: currentColor,
+    fontSize: fontSize
+  };
+  placedItems.push(item);
+  pushElementToFirebase(item);
+  setTool('select');
+  selectedIdx = placedItems.length - 1;
+  renderAll();
+  saveHistory();
+  toast('تم إضافة النص — يمكنك تحريكه');
+});
+
+textInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); textConfirm.click(); }
+  if (e.key === 'Escape') textCancel.click();
+});
+
+// ============ زر الصورة ============
+imageBtn.addEventListener('click', () => {
+  setTool('image');
+  imageInput.value = '';
+  imageInput.click();
+});
+
+imageInput.addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) { setTool('select'); return; }
+  if (!file.type.startsWith('image/')) { toast('الملف ليس صورة', true); setTool('select'); return; }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvasRect = canvas.getBoundingClientRect();
+      const maxW = canvasRect.width * 0.6;
+      const maxH = canvasRect.height * 0.6;
+      let w = img.width, h = img.height;
+      const ratio = Math.min(maxW / w, maxH / h, 1);
+      w = w * ratio; h = h * ratio;
+
+      const item = {
+        id: Date.now() + Math.random(),
+        type: 'image',
+        img: img,
+        x: canvasRect.width / 2 - w / 2,
+        y: canvasRect.height / 2 - h / 2,
+        w: w, h: h,
+        rotation: 0,
+        color: currentColor,
+        aspectRatio: img.width / img.height
+      };
+      placedItems.push(item);
+      pushElementToFirebase(item);
+      setTool('select');
+      selectedIdx = placedItems.length - 1;
+      renderAll();
+      saveHistory();
+      toast('تم إضافة الصورة');
+    };
+    img.onerror = () => { toast('فشل تحميل الصورة', true); setTool('select'); };
+    img.src = ev.target.result;
+  };
+  reader.onerror = () => { toast('فشل قراءة الملف', true); setTool('select'); };
+  reader.readAsDataURL(file);
+});
+
+// ============ خالط الألوان ============
+colorPicker.addEventListener('input', () => {
+  currentColor = colorPicker.value;
+  document.querySelectorAll('.color-dot').forEach(s => s.classList.remove('active'));
+  if (selectedIdx >= 0) {
+    const it = placedItems[selectedIdx];
+    if (it.type !== 'image') {
+      it.color = currentColor;
+      pushElementToFirebase(it);
+      renderAll();
+      saveHistory();
+    }
+  }
+});
+
+// ============ إظهار/إخفاء الأشكال ============
+shapesBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  shapesPanel.classList.toggle('open');
+  shapesBtn.classList.toggle('active');
+});
+
+// ============ الرسم ============
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+function drawShapeOnCtx(targetCtx, shapeId, x0, y0, x1, y1, color, lineWidth) {
+  if (!shapeId) return;
+  targetCtx.save();
+  targetCtx.strokeStyle = color;
+  targetCtx.lineWidth = lineWidth;
+  targetCtx.lineCap = 'round';
+  targetCtx.lineJoin = 'round';
+  targetCtx.beginPath();
+
+  const w = x1 - x0, h = y1 - y0;
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const r = Math.min(Math.abs(w), Math.abs(h)) / 2;
+  const rx = Math.abs(w) / 2, ry = Math.abs(h) / 2;
+
+  switch (shapeId) {
+    case 'line': targetCtx.moveTo(x0, y0); targetCtx.lineTo(x1, y1); break;
+    case 'rect': targetCtx.rect(Math.min(x0,x1), Math.min(y0,y1), Math.abs(w), Math.abs(h)); break;
+    case 'roundedRect': {
+      const rad = Math.min(10, Math.abs(w)/4, Math.abs(h)/4);
+      const x = Math.min(x0,x1), y = Math.min(y0,y1), rw = Math.abs(w), rh = Math.abs(h);
+      targetCtx.moveTo(x+rad,y); targetCtx.lineTo(x+rw-rad,y);
+      targetCtx.quadraticCurveTo(x+rw,y,x+rw,y+rad);
+      targetCtx.lineTo(x+rw,y+rh-rad);
+      targetCtx.quadraticCurveTo(x+rw,y+rh,x+rw-rad,y+rh);
+      targetCtx.lineTo(x+rad,y+rh);
+      targetCtx.quadraticCurveTo(x,y+rh,x,y+rh-rad);
+      targetCtx.lineTo(x,y+rad);
+      targetCtx.quadraticCurveTo(x,y,x+rad,y);
+      break;
+    }
+    case 'circle': targetCtx.arc(cx, cy, r, 0, Math.PI*2); break;
+    case 'ellipse': targetCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI*2); break;
+    case 'triangle':
+      targetCtx.moveTo(cx, Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), Math.max(y0,y1));
+      targetCtx.lineTo(Math.min(x0,x1), Math.max(y0,y1));
+      targetCtx.closePath(); break;
+    case 'diamond':
+      targetCtx.moveTo(cx, Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), cy);
+      targetCtx.lineTo(cx, Math.max(y0,y1));
+      targetCtx.lineTo(Math.min(x0,x1), cy);
+      targetCtx.closePath(); break;
+    case 'star': {
+      const spikes=5, outer=r, inner=r*0.4;
+      for (let i=0;i<spikes*2;i++){
+        const rad=(i%2===0)?outer:inner;
+        const ang=(Math.PI/spikes)*i-Math.PI/2;
+        const px=cx+Math.cos(ang)*rad, py=cy+Math.sin(ang)*rad;
+        i===0?targetCtx.moveTo(px,py):targetCtx.lineTo(px,py);
+      }
+      targetCtx.closePath(); break;
+    }
+    case 'pentagon': {
+      for (let i=0;i<5;i++){
+        const ang=(Math.PI*2/5)*i-Math.PI/2;
+        const px=cx+Math.cos(ang)*r, py=cy+Math.sin(ang)*r;
+        i===0?targetCtx.moveTo(px,py):targetCtx.lineTo(px,py);
+      }
+      targetCtx.closePath(); break;
+    }
+    case 'hexagon': {
+      for (let i=0;i<6;i++){
+        const ang=(Math.PI*2/6)*i;
+        const px=cx+Math.cos(ang)*r, py=cy+Math.sin(ang)*r;
+        i===0?targetCtx.moveTo(px,py):targetCtx.lineTo(px,py);
+      }
+      targetCtx.closePath(); break;
+    }
+    case 'octagon': {
+      for (let i=0;i<8;i++){
+        const ang=(Math.PI*2/8)*i+Math.PI/8;
+        const px=cx+Math.cos(ang)*r, py=cy+Math.sin(ang)*r;
+        i===0?targetCtx.moveTo(px,py):targetCtx.lineTo(px,py);
+      }
+      targetCtx.closePath(); break;
+    }
+    case 'arrow': {
+      const ang=Math.atan2(h,w), len=Math.sqrt(w*w+h*h);
+      const hl=Math.min(20,len*0.3);
+      targetCtx.moveTo(x0,y0); targetCtx.lineTo(x1,y1);
+      targetCtx.moveTo(x1,y1);
+      targetCtx.lineTo(x1-hl*Math.cos(ang-Math.PI/6), y1-hl*Math.sin(ang-Math.PI/6));
+      targetCtx.moveTo(x1,y1);
+      targetCtx.lineTo(x1-hl*Math.cos(ang+Math.PI/6), y1-hl*Math.sin(ang+Math.PI/6));
+      break;
+    }
+    case 'cross':
+    case 'plus':
+      targetCtx.moveTo(cx,Math.min(y0,y1)); targetCtx.lineTo(cx,Math.max(y0,y1));
+      targetCtx.moveTo(Math.min(x0,x1),cy); targetCtx.lineTo(Math.max(x0,x1),cy);
+      break;
+    case 'heart': {
+      const sx=Math.abs(w)/2, sy=Math.abs(h)/2;
+      targetCtx.moveTo(cx, cy+sy*0.7);
+      targetCtx.bezierCurveTo(cx-sx, cy-sy*0.3, cx-sx*0.5, cy-sy, cx, cy-sy*0.3);
+      targetCtx.bezierCurveTo(cx+sx*0.5, cy-sy, cx+sx, cy-sy*0.3, cx, cy+sy*0.7);
+      break;
+    }
+    case 'cloud': {
+      targetCtx.arc(cx-rx*0.4, cy, r*0.7, Math.PI*0.5, Math.PI*1.5);
+      targetCtx.arc(cx, cy-ry*0.3, r*0.9, Math.PI*1.1, Math.PI*1.9);
+      targetCtx.arc(cx+rx*0.4, cy, r*0.7, Math.PI*1.5, Math.PI*0.5);
+      break;
+    }
+    case 'trapezoid':
+      targetCtx.moveTo(Math.min(x0,x1)+Math.abs(w)*0.2, Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1)-Math.abs(w)*0.2, Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), Math.max(y0,y1));
+      targetCtx.lineTo(Math.min(x0,x1), Math.max(y0,y1));
+      targetCtx.closePath(); break;
+    case 'parallelogram':
+      targetCtx.moveTo(Math.min(x0,x1)+Math.abs(w)*0.2, Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1)-Math.abs(w)*0.2, Math.max(y0,y1));
+      targetCtx.lineTo(Math.min(x0,x1), Math.max(y0,y1));
+      targetCtx.closePath(); break;
+    case 'moon':
+      targetCtx.arc(cx, cy, r, Math.PI*0.3, Math.PI*1.7);
+      targetCtx.arc(cx+r*0.4, cy, r*0.8, Math.PI*1.5, Math.PI*0.5, true);
+      break;
+    case 'sun':
+      targetCtx.arc(cx, cy, r*0.5, 0, Math.PI*2);
+      for (let i=0;i<8;i++){
+        const ang=(Math.PI*2/8)*i;
+        targetCtx.moveTo(cx+Math.cos(ang)*r*0.7, cy+Math.sin(ang)*r*0.7);
+        targetCtx.lineTo(cx+Math.cos(ang)*r, cy+Math.sin(ang)*r);
+      }
+      break;
+    case 'lightning':
+      targetCtx.moveTo(cx+w*0.1, Math.min(y0,y1));
+      targetCtx.lineTo(cx-w*0.15, cy);
+      targetCtx.lineTo(cx+w*0.05, cy);
+      targetCtx.lineTo(cx-w*0.1, Math.max(y0,y1));
+      targetCtx.lineTo(cx+w*0.15, cy);
+      targetCtx.lineTo(cx-w*0.05, cy);
+      targetCtx.closePath(); break;
+    case 'speech':
+      targetCtx.moveTo(Math.min(x0,x1), Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), Math.max(y0,y1)-Math.abs(h)*0.25);
+      targetCtx.lineTo(cx+Math.abs(w)*0.1, Math.max(y0,y1)-Math.abs(h)*0.25);
+      targetCtx.lineTo(cx, Math.max(y0,y1));
+      targetCtx.lineTo(cx-Math.abs(w)*0.1, Math.max(y0,y1)-Math.abs(h)*0.25);
+      targetCtx.lineTo(Math.min(x0,x1), Math.max(y0,y1)-Math.abs(h)*0.25);
+      targetCtx.closePath(); break;
+    case 'shield':
+      targetCtx.moveTo(cx, Math.min(y0,y1));
+      targetCtx.lineTo(Math.max(x0,x1), Math.min(y0,y1)+Math.abs(h)*0.25);
+      targetCtx.lineTo(Math.max(x0,x1), cy);
+      targetCtx.quadraticCurveTo(Math.max(x0,x1), Math.max(y0,y1), cx, Math.max(y0,y1));
+      targetCtx.quadraticCurveTo(Math.min(x0,x1), Math.max(y0,y1), Math.min(x0,x1), cy);
+      targetCtx.lineTo(Math.min(x0,x1), Math.min(y0,y1)+Math.abs(h)*0.25);
+      targetCtx.closePath(); break;
+    case 'location':
+      targetCtx.arc(cx, cy-ry*0.2, r*0.8, Math.PI*0.8, Math.PI*0.2, true);
+      targetCtx.lineTo(cx, Math.max(y0,y1));
+      targetCtx.closePath(); break;
+  }
+  targetCtx.stroke();
+  targetCtx.restore();
+}
+
+// ============ البحث عن العناصر ============
+function findItemAt(x, y) {
+  for (let i = placedItems.length - 1; i >= 0; i--) {
+    const it = placedItems[i];
+    const cx = it.x + it.w / 2;
+    const cy = it.y + it.h / 2;
+    const cos = Math.cos(-it.rotation);
+    const sin = Math.sin(-it.rotation);
+    const dx = x - cx, dy = y - cy;
+    const lx = cx + dx * cos - dy * sin;
+    const ly = cy + dx * sin + dy * cos;
+    const margin = 15;
+    if (lx >= it.x - margin && lx <= it.x + it.w + margin &&
+        ly >= it.y - margin && ly <= it.y + it.h + margin) return i;
+  }
+  return -1;
+}
+
+function findCornerAt(x, y) {
+  if (selectedIdx < 0) return null;
+  const it = placedItems[selectedIdx];
+  const corners = getItemCorners(it);
+  const names = ['tl', 'tr', 'br', 'bl'];
+  for (let i = 0; i < corners.length; i++) {
+    const c = corners[i];
+    if (Math.hypot(x - c.x, y - c.y) < 15) return names[i];
+  }
+  return null;
+}
+
+function findRotateHandleAt(x, y) {
+  if (selectedIdx < 0) return false;
+  const it = placedItems[selectedIdx];
+  const cx = it.x + it.w / 2;
+  const cy = it.y + it.h / 2;
+  const cos = Math.cos(it.rotation);
+  const sin = Math.sin(it.rotation);
+  const dx = (it.x + it.w / 2) - cx;
+  const dy = (it.y - 30) - cy;
+  const rx = cx + dx * cos - dy * sin;
+  const ry = cy + dx * sin + dy * cos;
+  return Math.hypot(x - rx, y - ry) < 18;
+}
+
+// ============ أحداث الرسم ============
+function startDraw(e) {
+  e.preventDefault();
+  const pos = getPos(e);
+
+  if (currentTool === 'select') {
+    if (findRotateHandleAt(pos.x, pos.y)) {
+      isRotating = true;
+      const it = placedItems[selectedIdx];
+      const cx = it.x + it.w / 2;
+      const cy = it.y + it.h / 2;
+      rotateStartAngle = Math.atan2(pos.y - cy, pos.x - cx);
+      rotateStartRotation = it.rotation;
+      return;
+    }
+    const corner = findCornerAt(pos.x, pos.y);
+    if (corner) {
+      isResizing = true;
+      resizeCorner = corner;
+      const it = placedItems[selectedIdx];
+      resizeStartW = it.w;
+      resizeStartH = it.h;
+      resizeStartItemX = it.x;
+      resizeStartItemY = it.y;
+      resizeStartX = pos.x;
+      resizeStartY = pos.y;
+      return;
+    }
+    const idx = findItemAt(pos.x, pos.y);
+    if (idx >= 0) {
+      selectedIdx = idx;
+      isDragging = true;
+      const it = placedItems[idx];
+      dragOffsetX = pos.x - it.x;
+      dragOffsetY = pos.y - it.y;
+      const [sh] = placedItems.splice(idx, 1);
+      placedItems.push(sh);
+      selectedIdx = placedItems.length - 1;
+      renderAll();
+      return;
+    } else {
+      selectedIdx = -1;
+      renderAll();
+      return;
+    }
+  }
+
+  if (currentTool === 'text' || currentTool === 'image') return;
+
+  startX = pos.x; startY = pos.y;
+  lastX = pos.x; lastY = pos.y;
+  isDrawing = true;
+
+  if (currentTool === 'bucket') {
+    floodFill(Math.floor(pos.x), Math.floor(pos.y), currentColor);
+    isDrawing = false;
+    saveHistory();
+    scheduleSnapshot();
+    return;
+  }
+
+  if (currentTool === 'brush' || currentTool === 'pencil' || currentTool === 'eraser') {
+    baseCtx.beginPath();
+    baseCtx.moveTo(pos.x, pos.y);
+    baseCtx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+    baseCtx.lineWidth = currentSize;
+    baseCtx.lineCap = 'round';
+    baseCtx.lineJoin = 'round';
+    baseCtx.lineTo(pos.x, pos.y);
+    baseCtx.stroke();
+    renderAll();
+  }
+}
+
+function moveDraw(e) {
+  if (e.cancelable) e.preventDefault();
+  const pos = getPos(e);
+
+  if (currentTool === 'select') {
+    if (isRotating && selectedIdx >= 0) {
+      const it = placedItems[selectedIdx];
+      const cx = it.x + it.w / 2;
+      const cy = it.y + it.h / 2;
+      const angle = Math.atan2(pos.y - cy, pos.x - cx);
+      it.rotation = rotateStartRotation + (angle - rotateStartAngle);
+      renderAll();
+      return;
+    }
+    if (isResizing && selectedIdx >= 0) {
+      const it = placedItems[selectedIdx];
+      const dx = pos.x - resizeStartX;
+      const dy = pos.y - resizeStartY;
+
+      if (it.type === 'image' && it.aspectRatio) {
+        let newW, newH;
+        if (resizeCorner === 'br') { newW = Math.max(30, resizeStartW + dx); newH = newW / it.aspectRatio; }
+        else if (resizeCorner === 'tl') { newW = Math.max(30, resizeStartW - dx); newH = newW / it.aspectRatio; it.x = resizeStartItemX + (resizeStartW - newW); it.y = resizeStartItemY + (resizeStartH - newH); }
+        else if (resizeCorner === 'tr') { newW = Math.max(30, resizeStartW + dx); newH = newW / it.aspectRatio; it.y = resizeStartItemY + (resizeStartH - newH); }
+        else if (resizeCorner === 'bl') { newW = Math.max(30, resizeStartW - dx); newH = newW / it.aspectRatio; it.x = resizeStartItemX + (resizeStartW - newW); }
+        it.w = newW; it.h = newH;
+      } else {
+        if (resizeCorner === 'br') { it.w = Math.max(20, resizeStartW + dx); it.h = Math.max(20, resizeStartH + dy); }
+        else if (resizeCorner === 'tl') { it.w = Math.max(20, resizeStartW - dx); it.h = Math.max(20, resizeStartH - dy); it.x = resizeStartItemX + (resizeStartW - it.w); it.y = resizeStartItemY + (resizeStartH - it.h); }
+        else if (resizeCorner === 'tr') { it.w = Math.max(20, resizeStartW + dx); it.h = Math.max(20, resizeStartH - dy); it.y = resizeStartItemY + (resizeStartH - it.h); }
+        else if (resizeCorner === 'bl') { it.w = Math.max(20, resizeStartW - dx); it.h = Math.max(20, resizeStartH + dy); it.x = resizeStartItemX + (resizeStartW - it.w); }
+        if (it.type === 'text') it.fontSize = Math.max(8, it.h * 0.7);
+      }
+      renderAll();
+      return;
+    }
+    if (isDragging && selectedIdx >= 0) {
+      const it = placedItems[selectedIdx];
+      it.x = pos.x - dragOffsetX;
+      it.y = pos.y - dragOffsetY;
+      renderAll();
+      return;
+    }
+    return;
+  }
+
+  if (currentTool === 'text' || currentTool === 'image') return;
+  if (!isDrawing) return;
+
+  if (currentShape && (currentTool === 'brush' || currentTool === 'pencil')) {
+    renderAll();
+    ctx.save();
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawShapeOnCtx(ctx, currentShape, startX, startY, pos.x, pos.y, currentColor, currentSize);
+    ctx.restore();
+  } else if (currentTool === 'brush' || currentTool === 'pencil' || currentTool === 'eraser') {
+    baseCtx.beginPath();
+    baseCtx.moveTo(lastX, lastY);
+    baseCtx.lineTo(pos.x, pos.y);
+    baseCtx.strokeStyle = currentTool === 'eraser' ? '#ffffff' : currentColor;
+    baseCtx.lineWidth = currentSize;
+    baseCtx.lineCap = 'round';
+    baseCtx.lineJoin = 'round';
+    baseCtx.stroke();
+    lastX = pos.x; lastY = pos.y;
+    renderAll();
+  }
+}
+
+function endDraw(e) {
+  if (currentTool === 'select') {
+    if (isDragging || isRotating || isResizing) {
+      isDragging = false;
+      isRotating = false;
+      isResizing = false;
+      if (selectedIdx >= 0) pushElementToFirebase(placedItems[selectedIdx]);
+      renderAll();
+      saveHistory();
+    }
+    return;
+  }
+
+  if (currentTool === 'text' || currentTool === 'image') return;
+  if (!isDrawing) return;
+  e.preventDefault();
+  isDrawing = false;
+
+  if (currentShape && (currentTool === 'brush' || currentTool === 'pencil')) {
+    const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.changedTouches) { clientX = e.changedTouches[0].clientX; clientY = e.changedTouches[0].clientY; }
+    else { clientX = e.clientX; clientY = e.clientY; }
+    const x = clientX - rect.left, y = clientY - rect.top;
+
+    const item = {
+      id: Date.now() + Math.random(),
+      type: 'shape',
+      shapeId: currentShape,
+      x: Math.min(startX, x),
+      y: Math.min(startY, y),
+      w: Math.abs(x - startX),
+      h: Math.abs(y - startY),
+      rotation: 0,
+      color: currentColor,
+      lineWidth: currentSize
+    };
+    placedItems.push(item);
+    pushElementToFirebase(item);
+    renderAll();
+    saveHistory();
+
+    currentShape = null;
+    document.querySelectorAll('.shape-item').forEach(b => b.classList.remove('active'));
+    setTool('select');
+    selectedIdx = placedItems.length - 1;
+    renderAll();
+    toast('تم إضافة الشكل — يمكنك تحريكه وتدويره');
+    return;
+  }
+  saveHistory();
+  scheduleSnapshot();
+}
+
+// إرسال الرسم إلى Firebase بعد توقف
+function scheduleSnapshot(){
+  if(snapshotTimer) clearTimeout(snapshotTimer);
+  snapshotTimer = setTimeout(()=>{
+    pushSnapshotToFirebase();
+  }, 400);
+}
+
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', moveDraw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseleave', endDraw);
+
+canvas.addEventListener('touchstart', startDraw, { passive: false });
+canvas.addEventListener('touchmove', moveDraw, { passive: false });
+canvas.addEventListener('touchend', endDraw, { passive: false });
+canvas.addEventListener('touchcancel', endDraw, { passive: false });
+
+// ============ السطل ============
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b,255];
+}
+function floodFill(x, y, hexColor) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = baseLayer.width, h = baseLayer.height;
+  const px = Math.floor(x * dpr), py = Math.floor(y * dpr);
+  if (px < 0 || py < 0 || px >= w || py >= h) return;
+
+  const imgData = baseCtx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+  const targetColor = getPixel(data, w, px, py);
+  const fillColor = hexToRgb(hexColor);
+  if (colorMatch(targetColor, fillColor)) { renderAll(); return; }
+
+  const stack = [[px, py]];
+  const visited = new Uint8Array(w * h);
+
+  while (stack.length) {
+    const [cx, cy] = stack.pop();
+    let nx = cx, ny = cy;
+    while (ny >= 0 && colorMatch(getPixel(data, w, nx, ny), targetColor)) ny--;
+    ny++;
+    let spanLeft = false, spanRight = false;
+    while (ny < h && colorMatch(getPixel(data, w, nx, ny), targetColor)) {
+      setPixel(data, w, nx, ny, fillColor);
+      visited[ny * w + nx] = 1;
+      if (nx > 0) {
+        if (colorMatch(getPixel(data, w, nx-1, ny), targetColor) && !visited[ny*w+nx-1]) {
+          if (!spanLeft) { stack.push([nx-1, ny]); spanLeft = true; }
+        } else spanLeft = false;
+      }
+      if (nx < w-1) {
+        if (colorMatch(getPixel(data, w, nx+1, ny), targetColor) && !visited[ny*w+nx+1]) {
+          if (!spanRight) { stack.push([nx+1, ny]); spanRight = true; }
+        } else spanRight = false;
+      }
+      ny++;
+    }
+  }
+  baseCtx.putImageData(imgData, 0, 0);
+  renderAll();
+}
+function getPixel(data, w, x, y) {
+  const i = (y * w + x) * 4;
+  return [data[i], data[i+1], data[i+2], data[i+3]];
+}
+function setPixel(data, w, x, y, c) {
+  const i = (y * w + x) * 4;
+  data[i] = c[0]; data[i+1] = c[1]; data[i+2] = c[2]; data[i+3] = c[3];
+}
+function colorMatch(a, b) {
+  return Math.abs(a[0]-b[0])<30 && Math.abs(a[1]-b[1])<30 && Math.abs(a[2]-b[2])<30 && Math.abs(a[3]-b[3])<30;
+}
+
+// ============ السجل ============
+function saveHistory() {
+  const baseSnap = baseCtx.getImageData(0, 0, baseLayer.width, baseLayer.height);
+  const itemsSnap = placedItems.map(s => ({ ...s }));
+  const snap = { base: baseSnap, items: itemsSnap };
+  history = history.slice(0, historyIndex + 1);
+  history.push(snap);
+  if (history.length > MAX_HISTORY) history.shift();
+  historyIndex = history.length - 1;
+  updateHistoryButtons();
+}
+
+function applySnapshot(snap) {
+  if (!snap) return;
+  baseCtx.putImageData(snap.base, 0, 0);
+  placedItems = snap.items.map(s => ({ ...s }));
+  selectedIdx = -1;
+  renderAll();
+}
+
+function undo() {
+  if (historyIndex > 0) {
+    historyIndex--;
+    applySnapshot(history[historyIndex]);
+    updateHistoryButtons();
+    scheduleSnapshot();
+  }
+}
+function redo() {
+  if (historyIndex < history.length - 1) {
+    historyIndex++;
+    applySnapshot(history[historyIndex]);
+    updateHistoryButtons();
+    scheduleSnapshot();
+  }
+}
+function updateHistoryButtons() {
+  undoBtn.disabled = historyIndex <= 0;
+  redoBtn.disabled = historyIndex >= history.length - 1;
+}
+undoBtn.addEventListener('click', undo);
+redoBtn.addEventListener('click', redo);
+
+// ============ مسح الكل ============
+clearBtn.addEventListener('click', () => {
+  baseCtx.fillStyle = '#ffffff';
+  baseCtx.fillRect(0, 0, baseLayer.width, baseLayer.height);
+  placedItems.forEach(it => removeElementFromFirebase(it.firebaseId));
+  placedItems = [];
+  selectedIdx = -1;
+  renderAll();
+  saveHistory();
+  pushSnapshotToFirebase();
+  remove(ref(db, `rooms/${me.roomCode}/elements`)).catch(()=>{});
+  toast('تم مسح اللوحة');
+});
+
+// ============ التصدير ============
+downloadBtn.addEventListener('click', () => {
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
+  const tctx = tempCanvas.getContext('2d');
+  tctx.fillStyle = '#ffffff';
+  tctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+  tctx.drawImage(baseLayer, 0, 0);
+
+  const dpr = window.devicePixelRatio || 1;
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  placedItems.forEach(it => {
+    const cx = it.x + it.w / 2;
+    const cy = it.y + it.h / 2;
+    tctx.save();
+    tctx.translate(cx, cy);
+    tctx.rotate(it.rotation);
+    tctx.translate(-cx, -cy);
+    if (it.type === 'shape') {
+      drawShapeOnCtx(tctx, it.shapeId, it.x, it.y, it.x + it.w, it.y + it.h, it.color, it.lineWidth);
+    } else if (it.type === 'text') {
+      drawTextOnCtx(tctx, it);
+    } else if (it.type === 'image') {
+      drawImageOnCtx(tctx, it);
+    }
+    tctx.restore();
+  });
+
+  const link = document.createElement('a');
+  link.download = 'ClassBoard-' + Date.now() + '.png';
+  link.href = tempCanvas.toDataURL('image/png');
+  link.click();
+  toast('تم حفظ الصورة بنجاح');
+});
+
+// ============ اختصارات ============
+document.addEventListener('keydown', (e) => {
+  if (textModal.classList.contains('open')) return;
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z') { e.preventDefault(); undo(); }
+    if (e.key === 'y') { e.preventDefault(); redo(); }
+  }
+  if (e.key === 'b' || e.key === 'B') setTool('brush');
+  if (e.key === 'e' || e.key === 'E') setTool('eraser');
+  if (e.key === 'g' || e.key === 'G') setTool('bucket');
+  if (e.key === 'v' || e.key === 'V') setTool('select');
+  if (e.key === 't' || e.key === 'T') textBtn.click();
+  if (e.key === 'i' || e.key === 'I') imageBtn.click();
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIdx >= 0) {
+    const it = placedItems[selectedIdx];
+    removeElementFromFirebase(it.firebaseId);
+    placedItems.splice(selectedIdx, 1);
+    selectedIdx = -1;
+    renderAll();
+    saveHistory();
+  }
+});
+
+// ============ تشغيل ============
+function initApp(){
+  resizeCanvas();
+  updateHistoryButtons();
+
+  // اربط أزرار الأعضاء والمشاركة
+  document.getElementById('membersBtn').addEventListener('click', ()=>window.toggleMembersPanel());
+  document.getElementById('shareBtn').addEventListener('click', ()=>window.shareRoom());
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    let oldBase = null;
+    try { oldBase = baseCtx.getImageData(0, 0, baseLayer.width, baseLayer.height); } catch(e) {}
+
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    baseLayer.width = rect.width * dpr;
+    baseLayer.height = rect.height * dpr;
+    baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    baseCtx.fillStyle = '#ffffff';
+    baseCtx.fillRect(0, 0, rect.width, rect.height);
+
+    if (oldBase && oldBase.width > 0) {
+      const tmp = document.createElement('canvas');
+      tmp.width = oldBase.width; tmp.height = oldBase.height;
+      tmp.getContext('2d').putImageData(oldBase, 0, 0);
+      baseCtx.drawImage(tmp, 0, 0, oldBase.width / dpr, oldBase.height / dpr);
+    }
+    renderAll();
+  }, 200);
+});
+
+canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+// ============ Init ============
+(function init(){
+  const params = new URLSearchParams(location.search);
+  const code = params.get('room');
+  if(code){
+    document.querySelectorAll('.tab')[1].click();
+    $('joinCode').value = code.toUpperCase();
+  }
+})();
+</script>
+</body>
+</html>
